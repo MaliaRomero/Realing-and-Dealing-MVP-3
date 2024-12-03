@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Audio;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -25,19 +26,23 @@ public class GameManager : MonoBehaviour
 
     //-----------------VARIABLES FOR SOUND-------------------------
 
-    //public AudioClip click;
-    //public AudioClip error;
-    //public AudioClip fishing;
+    public GameObject musicObject;
+    private AudioSource bgMusicSource; // Example for background music
+    public AudioSource clickAudioSource;
+    public AudioSource errorAudioSource;
+    public AudioSource fishingAudioSource;
+    public AudioMixer main;
+    public string volumeParameter = "SFXVolume";
+    public Slider slider;
+
 
 
     //-----------------VARIABLES FOR GAME OBJECTS-------------------
     public List<Deck> decks = new List<Deck>();
-
     public Transform[] cardSlots;
-    
     public bool[] availableCardSlots;
-
     public int handIndex = 0; //for current card
+    public List<Card> activeCardsInHand = new List<Card>();
 
     //----------------VARIABLES FOR PLAYER UI----------------------
     public TextMeshProUGUI deckSizeText;
@@ -47,9 +52,7 @@ public class GameManager : MonoBehaviour
     public TextMeshProUGUI tackleBoxText;
     public TextMeshProUGUI trophyPointsText;
     private bool isPlayerTurn = true;
-
     public GameObject skipDiscardButton;
-
     public GameObject rouletteWheel;
 
     //-----------------VARIABLES FOR WIN/LOSE-------------------
@@ -57,11 +60,6 @@ public class GameManager : MonoBehaviour
     public GameObject winLosePanel;  // Win Screen
     public TextMeshProUGUI outOfBaitText;
     public TextMeshProUGUI fullHandText;
-
-    //-------------Variables how to play----------
-    public GameObject howToPanel;
-    public GameObject goFishButton;
-
 
 //***************************  FUNCTIONS *************************
 
@@ -72,9 +70,7 @@ public class GameManager : MonoBehaviour
     {
         instance = this;
 
-        skipDiscardButton.SetActive(false);//Turnn off skip discard button
-        //eventText.gameObject.SetActive(false);//Turn off event text
-
+        skipDiscardButton.SetActive(false);//Turn off skip discard button
 
         // Check if playerController is set
         if (playerController == null)
@@ -85,8 +81,6 @@ public class GameManager : MonoBehaviour
         if (roulette == null)
         {
             roulette = FindObjectOfType<Roulette>(true);//Needs true because its not set active
-            if (roulette == null)
-                Debug.LogError("Roulette instance not found in the scene.");
         }
 
         // Initialize PlayerController.me from the GameManager
@@ -95,22 +89,23 @@ public class GameManager : MonoBehaviour
             StartTurn(); //Lets the player take first turn
             Debug.Log("FIRST TURN");
         }
-        else
-        {
-            Debug.LogError("PlayerController not found!");
-        }
-    }
 
-//-----------------------How to play screen----------------------
-    public void onGoFishClicked()
-    {
-        /*
-        AudioSource audio = GetComponent<AudioSource>();
-        audio.clip = click;
-        audio.Play();
-        */
-        goFishButton.SetActive(false);
-        howToPanel.SetActive(false);
+        //Check and set audio clips, compatible with slider
+        if (musicObject != null)
+        {
+            var audioSources = musicObject.GetComponents<AudioSource>();
+            if (audioSources.Length >= 4)
+            {
+                bgMusicSource = audioSources[0];
+                clickAudioSource = audioSources[1];
+                errorAudioSource = audioSources[2];
+                fishingAudioSource = audioSources[3];
+            }
+            else
+            {
+                Debug.LogError("SOmething weird with the sounds");
+            }
+        }
     }
 
 //-----------------STARTS TURN-------------------------
@@ -131,16 +126,11 @@ public class GameManager : MonoBehaviour
 //---------------DRAWING ACTION-----------------------------
     public void DrawFromSpecificDeck(int deckIndex)
     {
-        // THISSSSS  Invoke("HideEventText", 0);
         if(isPlayerTurn == true){//If allowed to draw
             DrawCard(deckIndex);
         }
         else{
-                /*
-        AudioSource audio = GetComponent<AudioSource>();
-        audio.clip = error;
-        audio.Play();
-        */
+            PlayErrorSound();
             Debug.Log("Error! Not time to draw yet!");
         }
     }
@@ -177,13 +167,11 @@ public class GameManager : MonoBehaviour
             {
                 int baitCost = GetBaitCost(deckIndex);
 
-                if (roulette.luckyFish)
-                {/*
-                    AudioSource audio = GetComponent<AudioSource>();
-                    audio.clip = fish;//maybe new lucky fish sound?
-                    audio.Play();*/
+                if (roulette.luckyFish)//Only for lucky catch event, draw for free
+                {
+                    PlayFishingSound();
+                    AddCardToHand(randCard);//Add card to current hand- list for Resetting the game
                     
-
                     randCard.gameObject.SetActive(true);
                     randCard.handIndex = i;
                     randCard.transform.position = cardSlots[i].position;
@@ -199,7 +187,6 @@ public class GameManager : MonoBehaviour
                     roulette.luckyFish = false;
 
                     cardCounter++;
-                    Debug.Log(cardCounter);
 
                     // Update deck and discard pile UI
                     UpdateDeckUI();
@@ -207,24 +194,18 @@ public class GameManager : MonoBehaviour
                     return;
 
                 }
-                else if((playerController.baitCount < baitCost)){
-                                        /*
-                    AudioSource audio = GetComponent<AudioSource>();
-                    audio.clip = error;
-                    audio.Play();
-                    */
+                else if((playerController.baitCount < baitCost))
+                {
+                    PlayErrorSound();
                     Debug.Log("Not enough Bait :( ");
                     isPlayerTurn = true; //lets the player draw again
                     return;
                 }
                 else
                 {
-                    /*
-                    AudioSource audio = GetComponent<AudioSource>();
-                    audio.clip = fish;
-                    audio.Play();
-                    */
+                    PlayFishingSound();
                     isPlayerTurn = false; //Doesn't let the player draw again
+                    AddCardToHand(randCard);//Add card to current hand- list for Resetting the game
 
                     randCard.gameObject.SetActive(true);
                     randCard.handIndex = i;
@@ -235,8 +216,6 @@ public class GameManager : MonoBehaviour
 
                     // Assign the deck to the card (so it knows its origin)
                     randCard.originDeck = selectedDeck;
-
-
                     selectedDeck.cards.Remove(randCard); // Remove from the deck
                                         // Don't add to discard pile yet
 
@@ -245,8 +224,6 @@ public class GameManager : MonoBehaviour
                     UpdateBaitUI(playerController.baitCount);
 
                     cardCounter++;
-                    Debug.Log(cardCounter);
-
                     // Update deck and discard pile UI
                     UpdateDeckUI();
 
@@ -255,6 +232,19 @@ public class GameManager : MonoBehaviour
 
                 }
             }
+        }
+    }
+
+    public void AddCardToHand(Card card)
+    {
+        activeCardsInHand.Add(card);
+    }
+
+    public void RemoveCardFromHand(Card card)
+    {
+        if (activeCardsInHand.Contains(card))
+        {
+            activeCardsInHand.Remove(card);
         }
     }
 
@@ -268,11 +258,7 @@ public class GameManager : MonoBehaviour
 
     public void OnSkipDiscardClicked()
     {
-        /*
-        AudioSource audio = GetComponent<AudioSource>();
-        audio.clip = click;
-        audio.Play();
-        */
+        PlayClickSound();
         HideSkipDiscardButton();
         // If skipping the discard, proceed directly to the event and end the turn.
         rouletteWheel.SetActive(true);
@@ -288,10 +274,6 @@ public class GameManager : MonoBehaviour
     {
         skipDiscardButton.SetActive(true);//Turnn off skip discard button
     }
-
-//-----------------Reset Deck--------------------------------------------
-
-//----------------------EVENT ACTION--------------------------------------------
 
     //-------------------------UPDATE UI-----------------------------------------
     public void UpdateDeckUI()
@@ -336,6 +318,32 @@ public class GameManager : MonoBehaviour
         return 0; // Default cost
     }
 
+    //---------------SFX FUNCTIONS=====================
+
+        public void PlayClickSound()
+    {
+        if (clickAudioSource != null)
+        {
+            clickAudioSource.Play();
+        }
+    }
+
+    public void PlayErrorSound()
+    {
+        if (errorAudioSource != null)
+        {
+            errorAudioSource.Play();
+        }
+    }
+
+    public void PlayFishingSound()
+    {
+        if (fishingAudioSource != null)
+        {
+            fishingAudioSource.Play();
+        }
+    }
+
     //------------------------END AND RESET-------------------
     public void EndTurn()
     {
@@ -345,6 +353,7 @@ public class GameManager : MonoBehaviour
             rouletteWheel.SetActive(false);
             winLosePanel.SetActive(true);
             outOfBaitText.gameObject.SetActive(false);
+            fullHandText.gameObject.SetActive(true);
             Leaderboard.instance.SetLeaderboardEntry(playerController.points);
             Leaderboard.instance.leaderboardCanvas.SetActive(true);
             Leaderboard.instance.DisplayLeaderboard();
@@ -356,15 +365,52 @@ public class GameManager : MonoBehaviour
             rouletteWheel.SetActive(false);
             winLosePanel.SetActive(true);
             fullHandText.gameObject.SetActive(false);
+            outOfBaitText.gameObject.SetActive(true);
             Leaderboard.instance.SetLeaderboardEntry(playerController.points);
             Leaderboard.instance.leaderboardCanvas.SetActive(true);
             Leaderboard.instance.DisplayLeaderboard();
             outOfBaitText.text = "Looks like them fishies emptied your tackle box.\n Final Catch: " + playerController.points + " Trophy Points!";
         } else {
             isPlayerTurn = false;  // Set the turn flag to false when ending the turn
-            Debug.Log("Turn Over, starting new turn");
             StartTurn();
         }
     }
-}
 
+//---------------------------Reset Game---------------------------
+
+
+    public void ResetAllCardsInHand()
+    {
+        foreach (Card card in new List<Card>(activeCardsInHand)) // Create a copy to avoid issues with removal
+        {
+            card.ResetCard();
+        }
+    }
+
+    // Resets all decks
+    public void ResetAllDecks()
+    {
+        foreach (Deck deck in decks)
+        {
+            deck.ResetDeck();
+        }
+    }
+
+    // Main reset method
+    public void ResetGame()
+    {   //Leaderboard.instance.SetLeaderboardEntry(playerController.points);
+        //rouletteWheel.SetActive(false);
+        PlayClickSound();
+        isPlayerTurn = true;
+        ResetAllCardsInHand();
+        ResetAllDecks();
+        activeCardsInHand.Clear();
+        playerController.baitCount = 3; // Reset bait count
+        UpdateBaitUI(playerController.baitCount);
+        playerController.points = 0; // Reset trophy points
+        UpdateTrophyPointsUI(playerController.points);
+        winLosePanel.SetActive(false);
+        Leaderboard.instance.leaderboardCanvas.SetActive(false);
+        Debug.Log("Game has been reset!");
+    }
+}

@@ -28,6 +28,7 @@ public class Card : MonoBehaviour
         // Check if the card has not been played yet
         if ((!hasBeenPlayed) && gm.skipDiscardButton.activeSelf)
         {   
+            gm.PlayClickSound();
             gm.HideSkipDiscardButton();
 
             // Mark it as played and free up the card slot in hand
@@ -38,7 +39,6 @@ public class Card : MonoBehaviour
             GameManager.playerController.RemovePoints(pointValue);  // Subtract points when playing the card
             GameManager.playerController.AddBait(baitValue);        // Increase bait value as the card is discarded
             GameManager.instance.cardCounter--;
-            Debug.Log("Hand-" + GameManager.instance.cardCounter);
             MoveToDiscardPile();
 
             // Trigger an event in GameManager and end the turn
@@ -54,10 +54,11 @@ public class Card : MonoBehaviour
         // Ensure the card has an origin deck to move to its discard pile
         if (originDeck != null)
         {
-            Debug.Log("Move to discard pile");
-
+        
             // Add the card to the discard pile of its origin deck
             originDeck.discardPile.Add(this);
+            gm.RemoveCardFromHand(this);
+
 
             // Deactivate the card so it is no longer visible or interactive
             gameObject.SetActive(false);
@@ -69,5 +70,17 @@ public class Card : MonoBehaviour
         {
             renderer.enabled = false; // Turn off visibility
         }
+    }
+
+
+    //Reseting game
+    public void ResetCard()
+    {
+            gm.availableCardSlots[handIndex] = true;
+           // Adjust points and bait when the card is discarded
+            GameManager.playerController.RemovePoints(pointValue);  // Subtract points when playing the card
+            GameManager.playerController.AddBait(baitValue);        // Increase bait value as the card is discarded
+            GameManager.instance.cardCounter--;
+            MoveToDiscardPile();
     }
 }

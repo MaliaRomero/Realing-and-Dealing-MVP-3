@@ -25,4 +25,17 @@ public class Deck : MonoBehaviour
             card.hasBeenPlayed = false; // Reset the hasBeenPlayed flag
         }
     }
+
+    //Reset game
+    public void ResetAllCards()
+    {
+        foreach (Card card in cards)
+        {
+            card.gameObject.SetActive(false); // Hide the card
+            card.ResetCard(); // Optional: Reset card properties if needed
+        }
+        discardPile.AddRange(cards); // Add all cards to the discard pile
+        cards.Clear(); // Empty the deck
+        Debug.Log("All cards have been discarded and the deck is reset.");
+    }
 }

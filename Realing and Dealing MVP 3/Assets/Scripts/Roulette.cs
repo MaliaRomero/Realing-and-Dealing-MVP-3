@@ -21,6 +21,9 @@ public class Roulette : MonoBehaviour
     public bool canSpin = true;
     public GameObject okButton;
 
+    public GameManager gameManager; // Only for sound
+
+
     // Events triggered based on section
     private void Start()
     {
@@ -61,6 +64,7 @@ public class Roulette : MonoBehaviour
     // Function to start the wheel spinning, use to call events
     public void Rotate()
     {
+        gameManager.PlayClickSound();
         if ((!isSpinning) && (canSpin == true))
         {
             // Change torque for randomness
@@ -119,7 +123,7 @@ public class Roulette : MonoBehaviour
     { 
         canSpin = false;
         luckyFish = true;
-        eventText.text = "Event 2: Lucky catch - Draw a card for free!"; 
+        eventText.text = "Lucky catch: Draw a card for free!"; 
         okButton.gameObject.SetActive(true);
     }
 
@@ -189,6 +193,8 @@ public class Roulette : MonoBehaviour
 
     public void okButtonClicked()
     {
+
+        gameManager.PlayClickSound();
         gm.rouletteWheel.SetActive(false);
         canSpin = true;
         okButton.SetActive(false);        
